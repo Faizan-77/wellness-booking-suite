@@ -22,13 +22,13 @@ export default function Login() {
   // Get the intended destination from location state or default to dashboard
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      // Attempt login
-      const success = login(email, password);
+      // Attempt login with proper await
+      const success = await login(email, password);
       
       if (success) {
         toast({
@@ -37,13 +37,7 @@ export default function Login() {
         });
         
         // Navigate to the appropriate dashboard based on user role
-        if (email.includes("admin")) {
-          navigate("/admin-dashboard");
-        } else if (email.includes("doctor")) {
-          navigate("/doctor-dashboard");
-        } else {
-          navigate("/patient-dashboard");
-        }
+        navigate(from);
       } else {
         toast({
           title: "Login failed",
