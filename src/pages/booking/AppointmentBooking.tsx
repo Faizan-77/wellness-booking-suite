@@ -9,28 +9,56 @@ import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-// Mock doctor data
-const mockDoctor = {
-  id: 1,
-  name: "Dr. Sarah Johnson",
-  specialty: "Cardiologist",
-  image: "https://randomuser.me/api/portraits/women/68.jpg",
-  consultationFee: 150,
-};
+import { doctorService } from "@/services/DoctorService";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/components/ui/use-toast";
+import { useEffect } from "react";
 
 export default function AppointmentBooking() {
   const { doctorId } = useParams<{ doctorId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth(); // Get the current authenticated user
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [timeSlot, setTimeSlot] = useState("");
   const [appointmentType, setAppointmentType] = useState("in-person");
   const [reason, setReason] = useState("");
   const [step, setStep] = useState<1 | 2>(1);
   const [insurance, setInsurance] = useState("none");
+  const [doctor, setDoctor] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // This would normally fetch the doctor data based on doctorId
-  const doctor = mockDoctor;
+  // Fetch the doctor data when the component mounts
+  useEffect(() => {
+    const fetchDoctor = async () => {
+      if (!doctorId) return;
+      
+      try {
+        setLoading(true);
+        const doctorData = await doctorService.getDoctorById(parseInt(doctorId));
+        if (doctorData) {
+          setDoctor(doctorData);
+        } else {
+          toast({
+            title: "Error",
+            description: "Doctor not found",
+            variant: "destructive"
+          });
+          navigate("/doctors");
+        }
+      } catch (error) {
+        console.error("Error fetching doctor:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load doctor details",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDoctor();
+  }, [doctorId, navigate]);
 
   const timeSlots = [
     "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM", 
@@ -38,43 +66,89 @@ export default function AppointmentBooking() {
     "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM"
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (step === 1) {
+      if (!timeSlot) {
+        toast({
+          title: "Select Time",
+          description: "Please select a time slot for your appointment",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       setStep(2);
     } else {
-      // In a real app, this would send the appointment data to a server
-      console.log("Booking appointment with:", {
-        doctorId,
-        date,
-        timeSlot,
-        appointmentType,
-        reason,
-      });
-      
-      // Redirect to confirmation or dashboard
-      navigate("/patient-dashboard", { 
-        state: { bookingSuccess: true }
-      });
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to book an appointment",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      try {
+        // Book the appointment with the current user's ID
+        await doctorService.bookAppointment({
+          doctorId: parseInt(doctorId || "0"),
+          patientId: user.id, // Use the current user's ID
+          date: date || new Date(),
+          time: timeSlot,
+          status: "confirmed",
+          type: appointmentType,
+          notes: reason
+        });
+        
+        // Show success message
+        toast({
+          title: "Appointment Booked",
+          description: "Your appointment has been successfully scheduled",
+        });
+        
+        // Redirect to dashboard
+        navigate("/patient-dashboard", { 
+          state: { bookingSuccess: true }
+        });
+      } catch (error) {
+        console.error("Error booking appointment:", error);
+        toast({
+          title: "Booking Failed",
+          description: "There was an error booking your appointment. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="container py-8 flex justify-center items-center">
+        <p>Loading doctor information...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-8">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Book an Appointment</h1>
         
-        <div className="flex items-center mb-8 p-4 bg-muted rounded-lg">
-          <img
-            src={doctor.image}
-            alt={doctor.name}
-            className="w-16 h-16 rounded-full object-cover mr-4"
-          />
-          <div>
-            <h2 className="text-lg font-semibold">{doctor.name}</h2>
-            <p className="text-gray-500">{doctor.specialty}</p>
+        {doctor && (
+          <div className="flex items-center mb-8 p-4 bg-muted rounded-lg">
+            <img
+              src={doctor.image}
+              alt={doctor.name}
+              className="w-16 h-16 rounded-full object-cover mr-4"
+            />
+            <div>
+              <h2 className="text-lg font-semibold">{doctor.name}</h2>
+              <p className="text-gray-500">{doctor.specialty}</p>
+            </div>
           </div>
-        </div>
+        )}
         
         <Card>
           <CardHeader>

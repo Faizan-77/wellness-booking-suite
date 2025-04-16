@@ -291,6 +291,14 @@ class DoctorService {
     return patientAppointments;
   }
   
+  // Clear all appointment data (for testing purposes)
+  clearAppointments() {
+    this.appointments = [];
+    localStorage.setItem('appointments', JSON.stringify([]));
+    console.log("All appointments cleared");
+    return true;
+  }
+  
   // Get appointments for a specific doctor
   async getDoctorAppointments(doctorId: number): Promise<AppointmentType[]> {
     // Simulate API call
