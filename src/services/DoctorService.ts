@@ -1,3 +1,4 @@
+
 // Types
 export interface Doctor {
   id: number;
@@ -192,6 +193,9 @@ class DoctorService {
     // Load appointments from localStorage or initialize empty array
     const storedAppointments = localStorage.getItem('appointments');
     this.appointments = storedAppointments ? JSON.parse(storedAppointments) : [];
+    
+    // Debug: log appointments on load
+    console.log("Loaded appointments:", this.appointments);
   }
   
   // Get all doctors with optional filtering
@@ -241,13 +245,30 @@ class DoctorService {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    const newAppointment = {
-      ...appointment,
-      id: Date.now()
+    // Convert appointment data if needed
+    let processedAppointment = { ...appointment };
+    
+    // If date is a Date object, convert it to string
+    if (typeof processedAppointment.date !== 'string') {
+      processedAppointment.date = new Date(processedAppointment.date).toISOString().split('T')[0];
+    }
+    
+    // Create a new appointment with an ID
+    const newAppointment: AppointmentType = {
+      ...processedAppointment,
+      id: Date.now(),
+      status: processedAppointment.status || 'confirmed' // Default to confirmed if not provided
     };
     
+    // Add to appointments array
     this.appointments.push(newAppointment);
+    
+    // Save to localStorage
     localStorage.setItem('appointments', JSON.stringify(this.appointments));
+    
+    // Debug log
+    console.log("Booked appointment:", newAppointment);
+    console.log("All appointments after booking:", this.appointments);
     
     return newAppointment;
   }
@@ -257,7 +278,17 @@ class DoctorService {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    return this.appointments.filter(appointment => appointment.patientId === patientId);
+    console.log("Getting appointments for patient:", patientId);
+    console.log("All appointments:", this.appointments);
+    
+    // Filter appointments by patient ID
+    const patientAppointments = this.appointments.filter(appointment => 
+      appointment.patientId === patientId
+    );
+    
+    console.log("Filtered patient appointments:", patientAppointments);
+    
+    return patientAppointments;
   }
   
   // Get appointments for a specific doctor
@@ -294,7 +325,7 @@ class DoctorService {
     if (!doctor) return [];
     
     // Get day of week from date
-    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'lowercase' });
+    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
     
     // Check if doctor works on this day
     const workHours = doctor.workingHours?.[dayOfWeek];
