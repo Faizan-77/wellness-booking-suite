@@ -8,16 +8,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Menu, User, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navbar() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<"patient" | "doctor" | "admin" | null>(null);
+  const { user, isAuthenticated, logout } = useAuth();
   
-  // This would be replaced with actual authentication logic
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserRole(null);
+    logout();
   };
 
   return (
@@ -47,7 +44,7 @@ export function Navbar() {
         </nav>
         
         <div className="flex items-center gap-4">
-          {isLoggedIn ? (
+          {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
@@ -56,7 +53,7 @@ export function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem>
-                  <Link to={`/${userRole}-dashboard`} className="flex items-center gap-2 w-full">
+                  <Link to={`/${user?.role}-dashboard`} className="flex items-center gap-2 w-full">
                     My Dashboard
                   </Link>
                 </DropdownMenuItem>
@@ -105,7 +102,7 @@ export function Navbar() {
                 <DropdownMenuItem>
                   <Link to="/about" className="w-full">About</Link>
                 </DropdownMenuItem>
-                {!isLoggedIn && (
+                {!isAuthenticated && (
                   <DropdownMenuItem>
                     <Link to="/signup" className="w-full">Sign Up</Link>
                   </DropdownMenuItem>
