@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,100 +7,44 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, Star } from "lucide-react";
-
-// Mock data for doctors
-const mockDoctors = [
-  {
-    id: 1,
-    name: "Dr. Sarah Johnson",
-    specialty: "Cardiologist",
-    rating: 4.8,
-    reviews: 124,
-    location: "New York, NY",
-    experience: 12,
-    image: "https://randomuser.me/api/portraits/women/68.jpg",
-    available: true,
-    nextAvailable: "Today"
-  },
-  {
-    id: 2,
-    name: "Dr. Michael Chen",
-    specialty: "Dermatologist",
-    rating: 4.9,
-    reviews: 89,
-    location: "San Francisco, CA",
-    experience: 8,
-    image: "https://randomuser.me/api/portraits/men/32.jpg",
-    available: true,
-    nextAvailable: "Tomorrow"
-  },
-  {
-    id: 3,
-    name: "Dr. Emily Rodriguez",
-    specialty: "Pediatrician",
-    rating: 4.7,
-    reviews: 156,
-    location: "Chicago, IL",
-    experience: 15,
-    image: "https://randomuser.me/api/portraits/women/45.jpg",
-    available: true,
-    nextAvailable: "Today"
-  },
-  {
-    id: 4,
-    name: "Dr. James Wilson",
-    specialty: "Neurologist",
-    rating: 4.6,
-    reviews: 78,
-    location: "Boston, MA",
-    experience: 20,
-    image: "https://randomuser.me/api/portraits/men/46.jpg",
-    available: false,
-    nextAvailable: "Next Week"
-  },
-  {
-    id: 5,
-    name: "Dr. Sophia Patel",
-    specialty: "Psychiatrist",
-    rating: 4.9,
-    reviews: 112,
-    location: "Austin, TX",
-    experience: 10,
-    image: "https://randomuser.me/api/portraits/women/33.jpg",
-    available: true,
-    nextAvailable: "Tomorrow"
-  },
-  {
-    id: 6,
-    name: "Dr. Robert Kim",
-    specialty: "Orthopedic Surgeon",
-    rating: 4.8,
-    reviews: 94,
-    location: "Seattle, WA",
-    experience: 14,
-    image: "https://randomuser.me/api/portraits/men/22.jpg",
-    available: true,
-    nextAvailable: "Today"
-  }
-];
+import { Search, MapPin, Star, Loader2 } from "lucide-react";
+import { doctorService, Doctor } from "@/services/DoctorService";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function DoctorListing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [specialty, setSpecialty] = useState("all");
   const [distance, setDistance] = useState([10]);
   const [availableNow, setAvailableNow] = useState(false);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Filter doctors based on search criteria
-  const filteredDoctors = mockDoctors.filter(doctor => {
-    const matchesSearch = doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doctor.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSpecialty = specialty === "all" || doctor.specialty === specialty;
-    const matchesAvailability = !availableNow || doctor.available;
-    
-    return matchesSearch && matchesSpecialty && matchesAvailability;
-  });
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setIsLoading(true);
+        const data = await doctorService.getAllDoctors({
+          specialty: specialty !== 'all' ? specialty : undefined,
+          searchQuery,
+          availableOnly: availableNow,
+          maxDistance: distance[0]
+        });
+        setDoctors(data);
+      } catch (error) {
+        console.error("Failed to fetch doctors:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load doctor listings. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDoctors();
+  }, [searchQuery, specialty, availableNow, distance, toast]);
 
   return (
     <div className="container py-8">
@@ -191,8 +135,13 @@ export default function DoctorListing() {
         
         {/* Doctor Listing */}
         <div className="md:col-span-9 space-y-6">
-          {filteredDoctors.length > 0 ? (
-            filteredDoctors.map((doctor) => (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading doctors...</span>
+            </div>
+          ) : doctors.length > 0 ? (
+            doctors.map((doctor) => (
               <Card key={doctor.id} className="overflow-hidden">
                 <CardContent className="p-0">
                   <div className="flex flex-col md:flex-row">

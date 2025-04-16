@@ -1,56 +1,96 @@
 
 import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
-import { MapPin, Clock, Star, Award, Book, MessageSquare, ThumbsUp } from "lucide-react";
-import { useState } from "react";
-
-// Mock doctor data
-const mockDoctor = {
-  id: 1,
-  name: "Dr. Sarah Johnson",
-  specialty: "Cardiologist",
-  rating: 4.8,
-  reviews: 124,
-  location: "New York Medical Center, 123 Health St, New York, NY",
-  experience: 12,
-  image: "https://randomuser.me/api/portraits/women/68.jpg",
-  available: true,
-  education: [
-    { degree: "MD", institution: "Harvard Medical School", year: "2005-2009" },
-    { degree: "Residency", institution: "Johns Hopkins Hospital", year: "2009-2012" },
-    { degree: "Fellowship", institution: "Mayo Clinic", year: "2012-2014" }
-  ],
-  about: "Dr. Sarah Johnson is a board-certified cardiologist with over 12 years of experience in treating a wide range of heart conditions. She specializes in preventive cardiology, heart failure management, and cardiac rehabilitation. Dr. Johnson takes a holistic approach to heart health, focusing on lifestyle modifications alongside medical interventions.",
-  specializations: ["General Cardiology", "Preventive Cardiology", "Heart Failure", "Cardiac Rehabilitation"],
-  languages: ["English", "Spanish"],
-  insurance: ["Blue Cross", "Aetna", "Cigna", "Medicare"],
-  workingHours: {
-    monday: "9:00 AM - 5:00 PM",
-    tuesday: "9:00 AM - 5:00 PM",
-    wednesday: "9:00 AM - 5:00 PM",
-    thursday: "9:00 AM - 5:00 PM",
-    friday: "9:00 AM - 3:00 PM",
-    saturday: "Closed",
-    sunday: "Closed"
-  },
-  services: ["Consultation", "ECG", "Stress Test", "Echocardiogram", "Holter Monitoring"],
-  testimonials: [
-    { id: 1, name: "John D.", rating: 5, comment: "Dr. Johnson was incredibly thorough and took the time to explain everything in detail. Highly recommend!" },
-    { id: 2, name: "Maria S.", rating: 4, comment: "Very professional and knowledgeable. The wait time was a bit long, but the care was excellent." },
-    { id: 3, name: "Robert L.", rating: 5, comment: "Dr. Johnson helped me manage my heart condition and improved my quality of life significantly." }
-  ]
-};
+import { MapPin, Clock, Star, Award, Book, MessageSquare, ThumbsUp, Loader2 } from "lucide-react";
+import { doctorService, Doctor } from "@/services/DoctorService";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function DoctorProfile() {
   const { id } = useParams<{ id: string }>();
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const { toast } = useToast();
 
-  // In a real app, we would fetch doctor data based on ID
-  const doctor = mockDoctor;
+  useEffect(() => {
+    const fetchDoctorData = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoading(true);
+        const doctorData = await doctorService.getDoctorById(parseInt(id));
+        if (doctorData) {
+          setDoctor(doctorData);
+        } else {
+          toast({
+            title: "Doctor not found",
+            description: "The requested doctor profile could not be found.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching doctor:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load doctor profile. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDoctorData();
+  }, [id, toast]);
+
+  useEffect(() => {
+    const fetchAvailableSlots = async () => {
+      if (!doctor || !date) return;
+      
+      try {
+        const formattedDate = date.toISOString().split('T')[0];
+        const slots = await doctorService.getAvailableTimeSlots(doctor.id, formattedDate);
+        setAvailableTimeSlots(slots);
+      } catch (error) {
+        console.error("Error fetching available slots:", error);
+      }
+    };
+
+    if (doctor && date) {
+      fetchAvailableSlots();
+    }
+  }, [doctor, date]);
+
+  if (isLoading) {
+    return (
+      <div className="container flex justify-center items-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading doctor profile...</span>
+      </div>
+    );
+  }
+
+  if (!doctor) {
+    return (
+      <div className="container py-8">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold mb-2">Doctor Not Found</h2>
+            <p>The doctor profile you're looking for doesn't exist.</p>
+            <Link to="/doctors">
+              <Button className="mt-4">Browse All Doctors</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-8">
@@ -87,9 +127,15 @@ export default function DoctorProfile() {
                   <Clock className="w-5 h-5 text-gray-500 mt-0.5" />
                   <div className="ml-2 text-sm">
                     <p className="font-medium">Working Hours</p>
-                    <p>Monday - Thursday: {doctor.workingHours.monday}</p>
-                    <p>Friday: {doctor.workingHours.friday}</p>
-                    <p>Saturday - Sunday: {doctor.workingHours.saturday}</p>
+                    {doctor.workingHours ? (
+                      <>
+                        <p>Monday - Thursday: {doctor.workingHours.monday}</p>
+                        <p>Friday: {doctor.workingHours.friday}</p>
+                        <p>Saturday - Sunday: {doctor.workingHours.saturday}</p>
+                      </>
+                    ) : (
+                      <p>Working hours not available</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -97,18 +143,18 @@ export default function DoctorProfile() {
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="font-medium mb-2">Languages</h3>
                 <div className="flex flex-wrap gap-2">
-                  {doctor.languages.map((language) => (
+                  {doctor.languages?.map((language) => (
                     <Badge key={language} variant="outline">{language}</Badge>
-                  ))}
+                  )) || <span className="text-sm text-gray-500">Not specified</span>}
                 </div>
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="font-medium mb-2">Insurance Accepted</h3>
                 <div className="flex flex-wrap gap-2">
-                  {doctor.insurance.map((ins) => (
+                  {doctor.insurance?.map((ins) => (
                     <Badge key={ins} variant="outline">{ins}</Badge>
-                  ))}
+                  )) || <span className="text-sm text-gray-500">Not specified</span>}
                 </div>
               </div>
 
@@ -139,11 +185,11 @@ export default function DoctorProfile() {
               <Card>
                 <CardContent className="p-6">
                   <h2 className="text-lg font-semibold mb-4">About</h2>
-                  <p className="text-gray-700">{doctor.about}</p>
+                  <p className="text-gray-700">{doctor.about || "No detailed information available for this doctor."}</p>
                   
                   <h3 className="text-lg font-semibold mt-6 mb-4">Education & Training</h3>
                   <div className="space-y-4">
-                    {doctor.education.map((edu, index) => (
+                    {doctor.education?.map((edu, index) => (
                       <div key={index} className="flex">
                         <div className="mr-4 flex-shrink-0">
                           <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
@@ -155,14 +201,18 @@ export default function DoctorProfile() {
                           <p className="text-sm text-gray-500">{edu.institution}, {edu.year}</p>
                         </div>
                       </div>
-                    ))}
+                    )) || (
+                      <p className="text-gray-500">No education information available.</p>
+                    )}
                   </div>
                   
                   <h3 className="text-lg font-semibold mt-6 mb-4">Specializations</h3>
                   <div className="flex flex-wrap gap-2">
-                    {doctor.specializations.map((spec) => (
+                    {doctor.specializations?.map((spec) => (
                       <Badge key={spec} variant="secondary">{spec}</Badge>
-                    ))}
+                    )) || (
+                      <p className="text-gray-500">No specializations listed.</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -172,14 +222,18 @@ export default function DoctorProfile() {
               <Card>
                 <CardContent className="p-6">
                   <h2 className="text-lg font-semibold mb-4">Services Offered</h2>
-                  <div className="space-y-2">
-                    {doctor.services.map((service) => (
-                      <div key={service} className="flex items-center">
-                        <div className="h-2 w-2 rounded-full bg-primary mr-2" />
-                        <span>{service}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {doctor.services && doctor.services.length > 0 ? (
+                    <div className="space-y-2">
+                      {doctor.services.map((service) => (
+                        <div key={service} className="flex items-center">
+                          <div className="h-2 w-2 rounded-full bg-primary mr-2" />
+                          <span>{service}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No services information available.</p>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -196,26 +250,30 @@ export default function DoctorProfile() {
                     </div>
                   </div>
                   
-                  <div className="space-y-6">
-                    {doctor.testimonials.map((testimonial) => (
-                      <div key={testimonial.id} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
-                        <div className="flex justify-between items-center mb-2">
-                          <h3 className="font-medium">{testimonial.name}</h3>
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-4 h-4 ${i < testimonial.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`} />
-                            ))}
+                  {doctor.testimonials && doctor.testimonials.length > 0 ? (
+                    <div className="space-y-6">
+                      {doctor.testimonials.map((testimonial) => (
+                        <div key={testimonial.id} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
+                          <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-medium">{testimonial.name}</h3>
+                            <div className="flex">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className={`w-4 h-4 ${i < testimonial.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`} />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-gray-600">{testimonial.comment}</p>
+                          <div className="flex items-center mt-3">
+                            <Button variant="ghost" size="sm" className="text-gray-500 hover:text-primary">
+                              <ThumbsUp className="w-4 h-4 mr-1" /> Helpful
+                            </Button>
                           </div>
                         </div>
-                        <p className="text-gray-600">{testimonial.comment}</p>
-                        <div className="flex items-center mt-3">
-                          <Button variant="ghost" size="sm" className="text-gray-500 hover:text-primary">
-                            <ThumbsUp className="w-4 h-4 mr-1" /> Helpful
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No reviews available yet.</p>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -232,19 +290,30 @@ export default function DoctorProfile() {
                         selected={date}
                         onSelect={setDate}
                         className="rounded-md border"
+                        disabled={(date) => {
+                          // Disable past dates and weekends
+                          const day = date.getDay();
+                          const isPastDate = date < new Date(new Date().setHours(0, 0, 0, 0));
+                          const isWeekend = day === 0 || day === 6; // Sunday or Saturday
+                          return isPastDate || isWeekend;
+                        }}
                       />
                     </div>
                     
                     <div className="flex-1">
                       <h3 className="text-sm font-medium mb-4">Available time slots</h3>
                       {date ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM"].map((time) => (
-                            <Button key={time} variant="outline" className="justify-start">
-                              {time}
-                            </Button>
-                          ))}
-                        </div>
+                        availableTimeSlots.length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {availableTimeSlots.map((time) => (
+                              <Button key={time} variant="outline" className="justify-start">
+                                {time}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">No available slots for the selected date.</p>
+                        )
                       ) : (
                         <p className="text-gray-500">Please select a date to see available times</p>
                       )}

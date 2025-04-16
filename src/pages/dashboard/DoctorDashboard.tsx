@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -19,131 +20,158 @@ import {
   FileText,
   Users,
   Activity,
-  Settings
+  Settings,
+  Loader2
 } from "lucide-react";
-
-// Mock data for doctor dashboard
-const mockAppointments = [
-  {
-    id: 1,
-    patientName: "John Smith",
-    age: 42,
-    gender: "Male",
-    date: "2025-04-20",
-    time: "10:00 AM",
-    status: "confirmed",
-    type: "Check-up",
-    image: "https://randomuser.me/api/portraits/men/73.jpg",
-  },
-  {
-    id: 2,
-    patientName: "Emma Johnson",
-    age: 35,
-    gender: "Female",
-    date: "2025-04-20",
-    time: "11:30 AM",
-    status: "confirmed",
-    type: "Follow-up",
-    image: "https://randomuser.me/api/portraits/women/52.jpg",
-  },
-  {
-    id: 3,
-    patientName: "Michael Brown",
-    age: 58,
-    gender: "Male",
-    date: "2025-04-20",
-    time: "2:00 PM",
-    status: "pending",
-    type: "Consultation",
-    image: "https://randomuser.me/api/portraits/men/45.jpg",
-  },
-  {
-    id: 4,
-    patientName: "Sophia Garcia",
-    age: 29,
-    gender: "Female",
-    date: "2025-04-21",
-    time: "9:30 AM",
-    status: "pending",
-    type: "New Patient",
-    image: "https://randomuser.me/api/portraits/women/33.jpg",
-  },
-];
-
-const mockPatients = [
-  {
-    id: 1,
-    name: "John Smith",
-    age: 42,
-    gender: "Male",
-    lastVisit: "2025-03-15",
-    condition: "Hypertension",
-    image: "https://randomuser.me/api/portraits/men/73.jpg",
-  },
-  {
-    id: 2,
-    name: "Emma Johnson",
-    age: 35,
-    gender: "Female",
-    lastVisit: "2025-04-01",
-    condition: "Migraine",
-    image: "https://randomuser.me/api/portraits/women/52.jpg",
-  },
-  {
-    id: 3,
-    name: "Michael Brown",
-    age: 58,
-    gender: "Male",
-    lastVisit: "2025-03-28",
-    condition: "Diabetes",
-    image: "https://randomuser.me/api/portraits/men/45.jpg",
-  },
-  {
-    id: 4,
-    name: "Sophia Garcia",
-    age: 29,
-    gender: "Female",
-    lastVisit: "New Patient",
-    condition: "General checkup",
-    image: "https://randomuser.me/api/portraits/women/33.jpg",
-  },
-];
-
-const mockMessages = [
-  {
-    id: 1,
-    patient: "John Smith",
-    message: "I've been feeling much better since our last appointment, but I still have some questions about the medication.",
-    date: "2025-04-10 10:30 AM",
-    read: false,
-    image: "https://randomuser.me/api/portraits/men/73.jpg",
-  },
-  {
-    id: 2,
-    patient: "Emma Johnson",
-    message: "My migraine symptoms have improved but I'm still experiencing occasional headaches in the afternoon.",
-    date: "2025-04-05 03:15 PM",
-    read: true,
-    image: "https://randomuser.me/api/portraits/women/52.jpg",
-  },
-];
-
-const doctorProfile = {
-  name: "Dr. Sarah Johnson",
-  specialty: "Cardiologist",
-  email: "dr.johnson@healthbooker.com",
-  phone: "(555) 987-6543",
-  hospital: "New York Medical Center",
-  image: "https://randomuser.me/api/portraits/women/68.jpg",
-};
+import { useAuth } from "@/contexts/AuthContext";
+import { doctorService, AppointmentType, PatientType } from "@/services/DoctorService";
 
 export default function DoctorDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedAppointment, setSelectedAppointment] = useState<number | null>(null);
+  const { user } = useAuth();
+  const [appointments, setAppointments] = useState<AppointmentType[]>([]);
+  const [patients, setPatients] = useState<PatientType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const todaysAppointments = mockAppointments.filter(
-    app => app.date === new Date().toISOString().split('T')[0]
+  // Mock data for messages
+  const mockMessages = [
+    {
+      id: 1,
+      patient: "John Smith",
+      message: "I've been feeling much better since our last appointment, but I still have some questions about the medication.",
+      date: "2025-04-10 10:30 AM",
+      read: false,
+      image: "https://randomuser.me/api/portraits/men/73.jpg",
+    },
+    {
+      id: 2,
+      patient: "Emma Johnson",
+      message: "My migraine symptoms have improved but I'm still experiencing occasional headaches in the afternoon.",
+      date: "2025-04-05 03:15 PM",
+      read: true,
+      image: "https://randomuser.me/api/portraits/women/52.jpg",
+    },
+  ];
+  
+  useEffect(() => {
+    const fetchDoctorData = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // For demo purposes, we'll use the user ID as the doctor ID
+        const doctorId = parseInt(user.id);
+        
+        // Fetch doctor's appointments
+        const doctorAppointments = await doctorService.getDoctorAppointments(doctorId);
+        setAppointments(doctorAppointments);
+        
+        // Extract unique patient IDs from appointments
+        const patientIds = [...new Set(doctorAppointments.map(app => app.patientId))];
+        
+        // In a real app, we'd fetch patient data from a patient service
+        // For now, we'll create mock patient data based on appointment info
+        const mockPatients: PatientType[] = patientIds.map(id => {
+          const randomGender = Math.random() > 0.5 ? "Male" : "Female";
+          const randomAge = Math.floor(Math.random() * 50) + 20;
+          const gender = randomGender;
+          const image = `https://randomuser.me/api/portraits/${gender === "Male" ? "men" : "women"}/${Math.floor(Math.random() * 70)}.jpg`;
+          
+          return {
+            id,
+            name: id.includes("john") ? "John Smith" : 
+                 id.includes("emma") ? "Emma Johnson" : 
+                 id.includes("michael") ? "Michael Brown" : 
+                 id.includes("sophia") ? "Sophia Garcia" : `Patient ${id.substring(0, 5)}`,
+            age: randomAge,
+            gender,
+            lastVisit: new Date().toISOString().split('T')[0],
+            condition: ["Hypertension", "Diabetes", "Migraine", "General checkup"][Math.floor(Math.random() * 4)],
+            image
+          };
+        });
+        
+        setPatients(mockPatients);
+      } catch (error) {
+        console.error("Error fetching doctor data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDoctorData();
+  }, [user]);
+  
+  const handleAcceptAppointment = async (appointmentId: number) => {
+    try {
+      await doctorService.updateAppointmentStatus(appointmentId, 'confirmed');
+      setAppointments(appointments.map(app => 
+        app.id === appointmentId ? { ...app, status: 'confirmed' } : app
+      ));
+      toast({
+        title: "Appointment Confirmed",
+        description: "The appointment has been accepted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update appointment status.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleDeclineAppointment = async (appointmentId: number) => {
+    try {
+      await doctorService.updateAppointmentStatus(appointmentId, 'cancelled');
+      setAppointments(appointments.map(app => 
+        app.id === appointmentId ? { ...app, status: 'cancelled' } : app
+      ));
+      toast({
+        title: "Appointment Declined",
+        description: "The appointment has been declined.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update appointment status.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const doctorProfile = {
+    name: user?.firstName && user.lastName ? `Dr. ${user.firstName} ${user.lastName}` : `Dr. ${user?.email?.split('@')[0]}` || "Doctor",
+    specialty: "Cardiologist", // In a real app, this would come from the doctor's profile
+    email: user?.email || "doctor@example.com",
+    phone: "(555) 987-6543",
+    hospital: "New York Medical Center",
+    image: "https://randomuser.me/api/portraits/women/68.jpg",
+  };
+  
+  // Filter today's appointments
+  const todaysAppointments = appointments.filter(
+    app => app.date === new Date().toISOString().split('T')[0] && app.status !== 'cancelled'
   );
+  
+  // Filter pending appointments
+  const pendingAppointments = appointments.filter(app => app.status === "pending");
+  
+  if (isLoading) {
+    return (
+      <div className="container flex justify-center items-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading dashboard data...</span>
+      </div>
+    );
+  }
   
   return (
     <div className="container py-8">
@@ -151,7 +179,7 @@ export default function DoctorDashboard() {
         <div className="flex items-center">
           <Avatar className="h-12 w-12 mr-4">
             <AvatarImage src={doctorProfile.image} />
-            <AvatarFallback>{doctorProfile.name.split(' ')[1][0]}</AvatarFallback>
+            <AvatarFallback>{doctorProfile.name.split(' ')[1]?.[0] || 'D'}</AvatarFallback>
           </Avatar>
           <div>
             <h1 className="text-3xl font-bold">Welcome, {doctorProfile.name}</h1>
@@ -189,7 +217,7 @@ export default function DoctorDashboard() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Pending Requests</p>
-              <p className="text-3xl font-bold">{mockAppointments.filter(a => a.status === "pending").length}</p>
+              <p className="text-3xl font-bold">{pendingAppointments.length}</p>
             </div>
             <div className="h-12 w-12 bg-yellow-100 rounded-full flex items-center justify-center">
               <Clock className="h-6 w-6 text-yellow-600" />
@@ -201,7 +229,7 @@ export default function DoctorDashboard() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Patients</p>
-              <p className="text-3xl font-bold">{mockPatients.length}</p>
+              <p className="text-3xl font-bold">{patients.length}</p>
             </div>
             <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
               <Users className="h-6 w-6 text-blue-600" />
@@ -242,87 +270,96 @@ export default function DoctorDashboard() {
                 </Button>
               </div>
               
-              {todaysAppointments.length > 0 ? todaysAppointments.map((appointment) => (
-                <Card 
-                  key={appointment.id}
-                  className={selectedAppointment === appointment.id ? "border-primary" : ""}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between">
-                      <div className="flex items-center mb-4 md:mb-0">
-                        <Avatar className="h-12 w-12 mr-4">
-                          <AvatarImage src={appointment.image} />
-                          <AvatarFallback>{appointment.patientName.split(' ')[0][0]}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="font-semibold">{appointment.patientName}</h3>
-                          <p className="text-sm text-gray-500">
-                            {appointment.age} years, {appointment.gender}
-                          </p>
-                          <p className="text-sm mt-1">
-                            <Badge variant="outline">{appointment.type}</Badge>
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-2 text-gray-500" />
-                          <span>{appointment.time}</span>
-                        </div>
-                        <Button 
-                          size="sm"
-                          onClick={() => setSelectedAppointment(appointment.id === selectedAppointment ? null : appointment.id)}
-                        >
-                          {selectedAppointment === appointment.id ? "Hide Details" : "View Details"}
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {selectedAppointment === appointment.id && (
-                      <div className="mt-6 pt-6 border-t">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {todaysAppointments.length > 0 ? todaysAppointments.map((appointment) => {
+                const patient = patients.find(p => p.id === appointment.patientId);
+                
+                return (
+                  <Card 
+                    key={appointment.id}
+                    className={selectedAppointment === appointment.id ? "border-primary" : ""}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between">
+                        <div className="flex items-center mb-4 md:mb-0">
+                          <Avatar className="h-12 w-12 mr-4">
+                            <AvatarImage src={patient?.image} />
+                            <AvatarFallback>{patient?.name.split(' ')[0][0] || 'P'}</AvatarFallback>
+                          </Avatar>
                           <div>
-                            <h4 className="font-medium mb-3">Patient Information</h4>
-                            <div className="space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Patient ID</span>
-                                <span>P-{appointment.id.toString().padStart(6, '0')}</span>
+                            <h3 className="font-semibold">{patient?.name || 'Patient'}</h3>
+                            <p className="text-sm text-gray-500">
+                              {patient?.age} years, {patient?.gender}
+                            </p>
+                            <p className="text-sm mt-1">
+                              <Badge variant="outline">{appointment.type}</Badge>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center gap-4">
+                          <div className="flex items-center">
+                            <Clock className="w-4 h-4 mr-2 text-gray-500" />
+                            <span>{appointment.time}</span>
+                          </div>
+                          <Button 
+                            size="sm"
+                            onClick={() => setSelectedAppointment(appointment.id === selectedAppointment ? null : appointment.id)}
+                          >
+                            {selectedAppointment === appointment.id ? "Hide Details" : "View Details"}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {selectedAppointment === appointment.id && (
+                        <div className="mt-6 pt-6 border-t">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <h4 className="font-medium mb-3">Patient Information</h4>
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">Patient ID</span>
+                                  <span>P-{appointment.patientId.substring(0, 6)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">Email</span>
+                                  <span>patient@example.com</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">Phone</span>
+                                  <span>(555) 123-4567</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">Condition</span>
+                                  <span>{patient?.condition || 'N/A'}</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Email</span>
-                                <span>patient@example.com</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Phone</span>
-                                <span>(555) 123-4567</span>
-                              </div>
+                            </div>
+                            
+                            <div>
+                              <h4 className="font-medium mb-3">Appointment Notes</h4>
+                              <Textarea 
+                                placeholder="Add notes for this appointment..."
+                                className="h-28"
+                                defaultValue={appointment.notes || ""}
+                              />
                             </div>
                           </div>
                           
-                          <div>
-                            <h4 className="font-medium mb-3">Appointment Notes</h4>
-                            <Textarea 
-                              placeholder="Add notes for this appointment..."
-                              className="h-28"
-                            />
+                          <div className="flex gap-2 mt-6 justify-end">
+                            <Button variant="outline" size="sm">
+                              <FileText className="mr-2 h-4 w-4" />
+                              Medical Records
+                            </Button>
+                            <Button size="sm">
+                              <Check className="mr-2 h-4 w-4" />
+                              Start Session
+                            </Button>
                           </div>
                         </div>
-                        
-                        <div className="flex gap-2 mt-6 justify-end">
-                          <Button variant="outline" size="sm">
-                            <FileText className="mr-2 h-4 w-4" />
-                            Medical Records
-                          </Button>
-                          <Button size="sm">
-                            <Check className="mr-2 h-4 w-4" />
-                            Start Session
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )) : (
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              }) : (
                 <Card>
                   <CardContent className="p-6 text-center py-12">
                     <h3 className="font-medium text-lg">No appointments scheduled for today</h3>
@@ -337,51 +374,71 @@ export default function DoctorDashboard() {
                 <h2 className="text-xl font-semibold">Pending Appointment Requests</h2>
               </div>
               
-              {mockAppointments
-                .filter(appointment => appointment.status === "pending")
-                .map((appointment) => (
-                  <Card key={appointment.id}>
-                    <CardContent className="p-6">
-                      <div className="flex flex-col md:flex-row items-start justify-between">
-                        <div className="flex items-center mb-4 md:mb-0">
-                          <Avatar className="h-12 w-12 mr-4">
-                            <AvatarImage src={appointment.image} />
-                            <AvatarFallback>{appointment.patientName.split(' ')[0][0]}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h3 className="font-semibold">{appointment.patientName}</h3>
-                            <p className="text-sm text-gray-500">
-                              {appointment.age} years, {appointment.gender}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <CalendarIcon className="w-4 h-4 text-gray-500" />
-                              <span className="text-sm">{new Date(appointment.date).toLocaleDateString()}</span>
-                              <Clock className="w-4 h-4 text-gray-500 ml-2" />
-                              <span className="text-sm">{appointment.time}</span>
+              {pendingAppointments.length > 0 ? (
+                pendingAppointments.map((appointment) => {
+                  const patient = patients.find(p => p.id === appointment.patientId);
+                  
+                  return (
+                    <Card key={appointment.id}>
+                      <CardContent className="p-6">
+                        <div className="flex flex-col md:flex-row items-start justify-between">
+                          <div className="flex items-center mb-4 md:mb-0">
+                            <Avatar className="h-12 w-12 mr-4">
+                              <AvatarImage src={patient?.image} />
+                              <AvatarFallback>{patient?.name.split(' ')[0][0] || 'P'}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold">{patient?.name || 'Patient'}</h3>
+                              <p className="text-sm text-gray-500">
+                                {patient?.age} years, {patient?.gender}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <CalendarIcon className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm">{new Date(appointment.date).toLocaleDateString()}</span>
+                                <Clock className="w-4 h-4 text-gray-500 ml-2" />
+                                <span className="text-sm">{appointment.time}</span>
+                              </div>
+                              <p className="text-sm mt-1">
+                                <Badge variant="outline">{appointment.type}</Badge>
+                              </p>
                             </div>
-                            <p className="text-sm mt-1">
-                              <Badge variant="outline">{appointment.type}</Badge>
-                            </p>
+                          </div>
+                          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <Button 
+                              size="sm" 
+                              className="flex-1 md:flex-none"
+                              onClick={() => handleAcceptAppointment(appointment.id)}
+                            >
+                              <Check className="mr-2 h-4 w-4" />
+                              Accept
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 md:flex-none"
+                              onClick={() => handleDeclineAppointment(appointment.id)}
+                            >
+                              <X className="mr-2 h-4 w-4" />
+                              Decline
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 md:flex-none">
+                              <Clock className="mr-2 h-4 w-4" />
+                              Reschedule
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                          <Button size="sm" className="flex-1 md:flex-none">
-                            <Check className="mr-2 h-4 w-4" />
-                            Accept
-                          </Button>
-                          <Button size="sm" variant="outline" className="flex-1 md:flex-none">
-                            <X className="mr-2 h-4 w-4" />
-                            Decline
-                          </Button>
-                          <Button size="sm" variant="outline" className="flex-1 md:flex-none">
-                            <Clock className="mr-2 h-4 w-4" />
-                            Reschedule
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center py-12">
+                    <h3 className="font-medium text-lg">No pending appointment requests</h3>
+                    <p className="text-gray-500 mt-2">You're all caught up!</p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
             
             <TabsContent value="patients" className="space-y-4 mt-6">
@@ -396,41 +453,50 @@ export default function DoctorDashboard() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {mockPatients.map((patient) => (
-                  <Card key={patient.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start">
-                        <Avatar className="h-12 w-12 mr-4">
-                          <AvatarImage src={patient.image} />
-                          <AvatarFallback>{patient.name.split(' ')[0][0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-semibold">{patient.name}</h3>
-                              <p className="text-sm text-gray-500">
-                                {patient.age} years, {patient.gender}
-                              </p>
+              {patients.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {patients.map((patient) => (
+                    <Card key={patient.id}>
+                      <CardContent className="p-6">
+                        <div className="flex items-start">
+                          <Avatar className="h-12 w-12 mr-4">
+                            <AvatarImage src={patient.image} />
+                            <AvatarFallback>{patient.name.split(' ')[0][0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-semibold">{patient.name}</h3>
+                                <p className="text-sm text-gray-500">
+                                  {patient.age} years, {patient.gender}
+                                </p>
+                              </div>
+                              <Button size="sm" variant="outline">View</Button>
                             </div>
-                            <Button size="sm" variant="outline">View</Button>
-                          </div>
-                          <div className="mt-2">
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-500 w-24">Last Visit:</span>
-                              <span className="text-sm">{patient.lastVisit}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-500 w-24">Condition:</span>
-                              <span className="text-sm">{patient.condition}</span>
+                            <div className="mt-2">
+                              <div className="flex items-center">
+                                <span className="text-sm text-gray-500 w-24">Last Visit:</span>
+                                <span className="text-sm">{patient.lastVisit || 'N/A'}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-sm text-gray-500 w-24">Condition:</span>
+                                <span className="text-sm">{patient.condition || 'N/A'}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center py-12">
+                    <h3 className="font-medium text-lg">No patients found</h3>
+                    <p className="text-gray-500 mt-2">You don't have any patients assigned yet</p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
             
             <TabsContent value="messages" className="space-y-4 mt-6">
@@ -489,6 +555,35 @@ export default function DoctorDashboard() {
                 onSelect={setDate}
                 className="rounded-md border"
               />
+              
+              {date && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Appointments on {date.toLocaleDateString()}</h4>
+                  {appointments.filter(app => 
+                    app.date === date.toISOString().split('T')[0] && app.status !== 'cancelled'
+                  ).length > 0 ? (
+                    <div className="space-y-2">
+                      {appointments
+                        .filter(app => app.date === date.toISOString().split('T')[0] && app.status !== 'cancelled')
+                        .map(app => {
+                          const patient = patients.find(p => p.id === app.patientId);
+                          return (
+                            <div key={app.id} className="text-sm p-2 rounded-md bg-primary/5 border border-primary/10">
+                              <div className="font-medium">{patient?.name || "Patient"}</div>
+                              <div className="flex items-center mt-1 text-gray-500">
+                                <Clock className="w-3 h-3 mr-1" />
+                                <span>{app.time}</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No appointments for this day</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
           

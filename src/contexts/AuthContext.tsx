@@ -13,15 +13,18 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   signup: (userData: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
     userType: string;
-  }) => boolean;
+  }) => Promise<boolean>;
   logout: () => void;
+  updateUserProfile: (userData: Partial<User>) => void;
+  getAllUsers: () => User[];
+  getUserById: (id: string) => User | undefined;
 }
 
 // Create the auth context
@@ -56,14 +59,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
   
-  // Login function - now checks against registered users
-  const login = (email: string, password: string): boolean => {
-    console.log("Logging in with:", { email, password });
+  // Login function - checks against registered users
+  const login = async (email: string, password: string): Promise<boolean> => {
+    console.log("Logging in with:", { email });
     
     // Simple validation
     if (!email || !password) {
       return false;
     }
+    
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     // Get registered users from localStorage
     const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
@@ -94,20 +100,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return true;
   };
   
-  // Signup function - now stores registered users
-  const signup = (userData: {
+  // Signup function - stores registered users
+  const signup = async (userData: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
     userType: string;
-  }): boolean => {
+  }): Promise<boolean> => {
     console.log("Signing up with:", userData);
     
     // Simple validation
     if (!userData.email || !userData.password) {
       return false;
     }
+    
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Get existing registered users
     const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
@@ -154,13 +163,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user');
   };
   
+  // Update user profile
+  const updateUserProfile = (userData: Partial<User>) => {
+    if (!user) return;
+    
+    const updatedUser = { ...user, ...userData };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    // Also update in registered users
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    const updatedUsers = registeredUsers.map((regUser: any) => 
+      regUser.id === user.id ? { ...regUser, ...userData } : regUser
+    );
+    localStorage.setItem('registeredUsers', JSON.stringify(updatedUsers));
+  };
+  
+  // Get all users (for admin functionality)
+  const getAllUsers = (): User[] => {
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    return registeredUsers.map((user: any) => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role
+    }));
+  };
+  
+  // Get user by ID
+  const getUserById = (id: string): User | undefined => {
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    const foundUser = registeredUsers.find((user: any) => user.id === id);
+    if (!foundUser) return undefined;
+    
+    return {
+      id: foundUser.id,
+      email: foundUser.email,
+      firstName: foundUser.firstName,
+      lastName: foundUser.lastName,
+      role: foundUser.role
+    };
+  };
+  
   return (
     <AuthContext.Provider value={{
       user,
       isAuthenticated: !!user,
       login,
       signup,
-      logout
+      logout,
+      updateUserProfile,
+      getAllUsers,
+      getUserById
     }}>
       {children}
     </AuthContext.Provider>
