@@ -49,32 +49,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+    
+    // Initialize registered users if none exist
+    if (!localStorage.getItem('registeredUsers')) {
+      localStorage.setItem('registeredUsers', JSON.stringify([]));
+    }
   }, []);
   
-  // Mock login function - in a real app this would make an API request
+  // Login function - now checks against registered users
   const login = (email: string, password: string): boolean => {
-    // This is a simplified mock authentication
-    // In a real app, you would validate against a backend
     console.log("Logging in with:", { email, password });
     
-    // Simple validation - would be done by backend in real app
+    // Simple validation
     if (!email || !password) {
       return false;
     }
     
-    // Mock user based on email address pattern
-    let role: 'patient' | 'doctor' | 'admin' = 'patient';
+    // Get registered users from localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
     
-    if (email.includes('admin')) {
-      role = 'admin';
-    } else if (email.includes('doctor')) {
-      role = 'doctor';
+    // Find the user with matching email and password
+    const matchedUser = registeredUsers.find(
+      (user: { email: string; password: string }) => 
+        user.email === email && user.password === password
+    );
+    
+    if (!matchedUser) {
+      console.log("Login failed: User not found or incorrect password");
+      return false;
     }
     
+    // Create user object without the password
     const userData: User = {
-      id: Math.random().toString(36).substring(2, 15),
-      email,
-      role
+      id: matchedUser.id,
+      email: matchedUser.email,
+      firstName: matchedUser.firstName,
+      lastName: matchedUser.lastName,
+      role: matchedUser.role
     };
     
     // Save user to state and localStorage
@@ -83,7 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return true;
   };
   
-  // Mock signup function - in a real app this would make an API request
+  // Signup function - now stores registered users
   const signup = (userData: {
     email: string;
     password: string;
@@ -91,27 +102,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     lastName: string;
     userType: string;
   }): boolean => {
-    // This is a simplified mock registration
     console.log("Signing up with:", userData);
     
-    // Simple validation - would be done by backend in real app
+    // Simple validation
     if (!userData.email || !userData.password) {
+      return false;
+    }
+    
+    // Get existing registered users
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    
+    // Check if user already exists
+    if (registeredUsers.some((user: { email: string }) => user.email === userData.email)) {
+      console.log("Signup failed: Email already registered");
       return false;
     }
     
     const role = userData.userType as 'patient' | 'doctor' | 'admin';
     
-    const newUser: User = {
+    // Create new user with ID
+    const newUser = {
       id: Math.random().toString(36).substring(2, 15),
       email: userData.email,
+      password: userData.password, // Note: In a real app, this should be hashed!
       firstName: userData.firstName,
       lastName: userData.lastName,
       role
     };
     
+    // Add to registered users
+    registeredUsers.push(newUser);
+    localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+    
+    // Create user object without the password for state
+    const userForState: User = {
+      id: newUser.id,
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      role
+    };
+    
     // Save user to state and localStorage
-    setUser(newUser);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    setUser(userForState);
+    localStorage.setItem('user', JSON.stringify(userForState));
     return true;
   };
   

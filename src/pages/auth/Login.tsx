@@ -36,7 +36,7 @@ export default function Login() {
           description: "Welcome back to HealthBooker!",
         });
         
-        // Navigate to the appropriate dashboard based on user type
+        // Navigate to the appropriate dashboard based on user role
         if (email.includes("admin")) {
           navigate("/admin-dashboard");
         } else if (email.includes("doctor")) {
@@ -47,7 +47,7 @@ export default function Login() {
       } else {
         toast({
           title: "Login failed",
-          description: "Invalid email or password.",
+          description: "Invalid email or password. Please check your credentials or sign up for an account.",
           variant: "destructive",
         });
       }
