@@ -7,9 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, Star, Loader2 } from "lucide-react";
+import { Search, MapPin, Star, Loader2, X, Filter } from "lucide-react";
 import { doctorService, Doctor } from "@/services/DoctorService";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 export default function DoctorListing() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,7 +26,22 @@ export default function DoctorListing() {
   const [availableNow, setAvailableNow] = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<Doctor[]>([]);
   const { toast } = useToast();
+
+  // Close command dialog with escape key
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((open) => !open);
+      }
+    };
+    
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -46,21 +69,60 @@ export default function DoctorListing() {
     fetchDoctors();
   }, [searchQuery, specialty, availableNow, distance, toast]);
 
+  // Handle search for command dialog
+  const handleSearch = async (query: string) => {
+    if (query.trim() === "") {
+      setSearchResults([]);
+      return;
+    }
+    
+    try {
+      const results = await doctorService.getAllDoctors({ searchQuery: query });
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search error:", error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search doctors. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSpecialty("all");
+    setDistance([10]);
+    setAvailableNow(false);
+  };
+
   return (
     <div className="container py-8">
       <h1 className="text-3xl font-bold mb-6">Find a Doctor</h1>
       
-      {/* Search and Filters */}
+      {/* Enhanced Search and Filters */}
       <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-4">
         <div className="col-span-1 lg:col-span-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Search doctors by name, specialty, or location"
-              className="pl-10"
+              className="pl-10 pr-16"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onClick={() => setOpen(true)}
             />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="absolute right-2 top-1/2 transform -translate-y-1/2"
+              onClick={() => setOpen(true)}
+            >
+              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Button>
           </div>
         </div>
         <div>
@@ -80,13 +142,50 @@ export default function DoctorListing() {
           </Select>
         </div>
       </div>
+
+      {/* Applied filters badge display */}
+      {(searchQuery || specialty !== "all" || availableNow || distance[0] !== 10) && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="text-sm text-gray-500">Applied filters:</div>
+          {searchQuery && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              Search: {searchQuery}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setSearchQuery("")} />
+            </Badge>
+          )}
+          {specialty !== "all" && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              Specialty: {specialty}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setSpecialty("all")} />
+            </Badge>
+          )}
+          {availableNow && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              Available Now
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setAvailableNow(false)} />
+            </Badge>
+          )}
+          {distance[0] !== 10 && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              Within {distance[0]} miles
+              <X className="h-3 w-3 cursor-pointer" onClick={() => setDistance([10])} />
+            </Badge>
+          )}
+          <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={clearFilters}>
+            Clear all
+          </Button>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
         {/* Filter Sidebar */}
         <div className="md:col-span-3 space-y-6">
           <Card>
             <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">Filters</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Filters</h3>
+                <Filter className="h-4 w-4 text-gray-500" />
+              </div>
               
               <div className="space-y-6">
                 <div className="space-y-2">
@@ -119,12 +218,7 @@ export default function DoctorListing() {
                 </div>
                 
                 <div className="pt-4">
-                  <Button variant="outline" className="w-full" onClick={() => {
-                    setSearchQuery("");
-                    setSpecialty("all");
-                    setDistance([10]);
-                    setAvailableNow(false);
-                  }}>
+                  <Button variant="outline" className="w-full" onClick={clearFilters}>
                     Reset Filters
                   </Button>
                 </div>
@@ -197,6 +291,55 @@ export default function DoctorListing() {
           )}
         </div>
       </div>
+
+      {/* Command Dialog for Advanced Search */}
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <CommandInput 
+          placeholder="Search doctors, specialties, locations..." 
+          onValueChange={handleSearch}
+        />
+        <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
+          <CommandGroup heading="Doctors">
+            {searchResults.map((doctor) => (
+              <CommandItem
+                key={doctor.id}
+                onSelect={() => {
+                  setSearchQuery(doctor.name);
+                  setOpen(false);
+                }}
+                className="flex items-center"
+              >
+                <img 
+                  src={doctor.image} 
+                  alt={doctor.name} 
+                  className="w-6 h-6 rounded-full mr-2"
+                />
+                <div className="flex flex-col">
+                  <span>{doctor.name}</span>
+                  <span className="text-xs text-gray-500">{doctor.specialty}</span>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading="Specialties">
+            {["Cardiologist", "Dermatologist", "Pediatrician", "Neurologist", "Psychiatrist", "Orthopedic Surgeon"]
+              .filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((specialty) => (
+                <CommandItem
+                  key={specialty}
+                  onSelect={() => {
+                    setSpecialty(specialty);
+                    setOpen(false);
+                  }}
+                >
+                  {specialty}
+                </CommandItem>
+              ))
+            }
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
     </div>
   );
 }
