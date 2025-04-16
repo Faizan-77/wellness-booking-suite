@@ -87,7 +87,7 @@ const mockDoctors = [
 
 export default function DoctorListing() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [specialty, setSpecialty] = useState("");
+  const [specialty, setSpecialty] = useState("all");
   const [distance, setDistance] = useState([10]);
   const [availableNow, setAvailableNow] = useState(false);
 
@@ -96,7 +96,7 @@ export default function DoctorListing() {
     const matchesSearch = doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doctor.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSpecialty = specialty === "" || doctor.specialty === specialty;
+    const matchesSpecialty = specialty === "all" || doctor.specialty === specialty;
     const matchesAvailability = !availableNow || doctor.available;
     
     return matchesSearch && matchesSpecialty && matchesAvailability;
@@ -125,7 +125,7 @@ export default function DoctorListing() {
               <SelectValue placeholder="Specialty" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Specialties</SelectItem>
+              <SelectItem value="all">All Specialties</SelectItem>
               <SelectItem value="Cardiologist">Cardiologist</SelectItem>
               <SelectItem value="Dermatologist">Dermatologist</SelectItem>
               <SelectItem value="Pediatrician">Pediatrician</SelectItem>
@@ -177,7 +177,7 @@ export default function DoctorListing() {
                 <div className="pt-4">
                   <Button variant="outline" className="w-full" onClick={() => {
                     setSearchQuery("");
-                    setSpecialty("");
+                    setSpecialty("all");
                     setDistance([10]);
                     setAvailableNow(false);
                   }}>

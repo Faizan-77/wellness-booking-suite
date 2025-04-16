@@ -27,6 +27,7 @@ export default function AppointmentBooking() {
   const [appointmentType, setAppointmentType] = useState("in-person");
   const [reason, setReason] = useState("");
   const [step, setStep] = useState<1 | 2>(1);
+  const [insurance, setInsurance] = useState("none");
 
   // This would normally fetch the doctor data based on doctorId
   const doctor = mockDoctor;
@@ -185,16 +186,16 @@ export default function AppointmentBooking() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="insurance">Insurance Provider</Label>
-                  <Select>
+                  <Select value={insurance} onValueChange={setInsurance}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select insurance" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">Self-pay</SelectItem>
                       <SelectItem value="blue-cross">Blue Cross</SelectItem>
                       <SelectItem value="aetna">Aetna</SelectItem>
                       <SelectItem value="cigna">Cigna</SelectItem>
                       <SelectItem value="medicare">Medicare</SelectItem>
-                      <SelectItem value="self-pay">Self-pay</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
