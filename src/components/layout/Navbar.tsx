@@ -17,6 +17,40 @@ export function Navbar() {
     logout();
   };
 
+  // Get navigation items based on user role
+  const getNavItems = () => {
+    if (!isAuthenticated) {
+      return [
+        { to: "/", label: "Home" },
+        { to: "/doctors", label: "Find Doctors" },
+        { to: "/services", label: "Services" },
+        { to: "/about", label: "About" },
+      ];
+    }
+
+    if (user?.role === "doctor") {
+      return [
+        { to: "/", label: "Home" },
+        { to: "/doctor-dashboard", label: "My Dashboard" },
+        { to: "/appointments", label: "My Appointments" },
+        { to: "/services", label: "Services" },
+      ];
+    }
+
+    if (user?.role === "patient") {
+      return [
+        { to: "/", label: "Home" },
+        { to: "/doctors", label: "Find Doctors" },
+        { to: "/patient-dashboard", label: "My Dashboard" },
+        { to: "/services", label: "Services" },
+      ];
+    }
+
+    return [];
+  };
+
+  const navItems = getNavItems();
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 shadow-sm">
       <div className="container flex items-center justify-between h-16 px-4 mx-auto">
@@ -29,18 +63,15 @@ export function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
-          <Link to="/" className="text-sm font-medium hover:text-primary">
-            Home
-          </Link>
-          <Link to="/doctors" className="text-sm font-medium hover:text-primary">
-            Find Doctors
-          </Link>
-          <Link to="/services" className="text-sm font-medium hover:text-primary">
-            Services
-          </Link>
-          <Link to="/about" className="text-sm font-medium hover:text-primary">
-            About
-          </Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="text-sm font-medium hover:text-primary"
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
         
         <div className="flex items-center gap-4">
@@ -90,18 +121,13 @@ export function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem>
-                  <Link to="/" className="w-full">Home</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link to="/doctors" className="w-full">Find Doctors</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link to="/services" className="w-full">Services</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link to="/about" className="w-full">About</Link>
-                </DropdownMenuItem>
+                {navItems.map((item) => (
+                  <DropdownMenuItem key={item.to}>
+                    <Link to={item.to} className="w-full">
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
                 {!isAuthenticated && (
                   <DropdownMenuItem>
                     <Link to="/signup" className="w-full">Sign Up</Link>
