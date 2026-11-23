@@ -62,7 +62,7 @@ export default function DoctorDashboard() {
         setIsLoading(true);
         
         // For demo purposes, we'll use the user ID as the doctor ID
-        const doctorId = parseInt(user.id);
+        const doctorId = user.id;
         
         // Fetch doctor's appointments
         const doctorAppointments = await doctorService.getDoctorAppointments(doctorId);

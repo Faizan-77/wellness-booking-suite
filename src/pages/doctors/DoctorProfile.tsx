@@ -24,7 +24,7 @@ export default function DoctorProfile() {
       
       try {
         setIsLoading(true);
-        const doctorData = await doctorService.getDoctorById(parseInt(id));
+        const doctorData = await doctorService.getDoctorById(id);
         if (doctorData) {
           setDoctor(doctorData);
         } else {
